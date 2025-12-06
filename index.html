@@ -1,59 +1,535 @@
-<div>Teachable Machine Image Model</div>
-<button type="button" onclick="init()">Start</button>
-<div id="webcam-container"></div>
-<div id="label-container"></div>
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8" />
+    <title>Teachable Machine 影像辨識 Demo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- 可選：Google 字型（有網路時會更好看，也可刪掉） -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet" />
+
+    <style>
+        :root {
+            --bg-gradient-start: #0f172a;
+            --bg-gradient-end: #1e293b;
+            --card-bg: #0b1120;
+            --card-border: #1f2937;
+            --accent: #38bdf8;
+            --accent-soft: rgba(56, 189, 248, 0.15);
+            --accent-strong: #0ea5e9;
+            --text-main: #e5e7eb;
+            --text-muted: #9ca3af;
+            --danger: #f97373;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Noto Sans TC", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: radial-gradient(circle at top, #1f2933 0, #020617 55%, #000 100%);
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .app-wrapper {
+            width: 100%;
+            max-width: 960px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .title-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.4);
+            font-size: 12px;
+            color: var(--text-muted);
+            background: rgba(15, 23, 42, 0.8);
+        }
+
+        .title-badge-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: #22c55e;
+            box-shadow: 0 0 8px rgba(34, 197, 94, 0.9);
+        }
+
+        h1 {
+            margin: 12px 0 6px;
+            font-size: clamp(26px, 3vw, 32px);
+            letter-spacing: 0.03em;
+        }
+
+        .subtitle {
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        .main-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .main-layout {
+                grid-template-columns: minmax(0, 1fr);
+            }
+        }
+
+        .card {
+            background: radial-gradient(circle at top left, rgba(56, 189, 248, 0.16), transparent 55%),
+                        radial-gradient(circle at bottom right, rgba(94, 234, 212, 0.12), transparent 60%),
+                        #020617;
+            border-radius: 18px;
+            border: 1px solid var(--card-border);
+            padding: 18px 18px 16px;
+            box-shadow: 0 24px 60px rgba(15, 23, 42, 0.9);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at top, rgba(56, 189, 248, 0.12), transparent 60%);
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        .card-inner {
+            position: relative;
+            z-index: 1;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+            gap: 12px;
+        }
+
+        .card-title {
+            font-weight: 600;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-title-icon {
+            width: 22px;
+            height: 22px;
+            border-radius: 999px;
+            background: radial-gradient(circle at 30% 20%, #a5f3fc, #38bdf8 60%, #0369a1);
+            box-shadow: 0 0 14px rgba(56, 189, 248, 0.8);
+        }
+
+        .status-chip {
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid rgba(148, 163, 184, 0.6);
+            color: var(--text-muted);
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 999px;
+            background: #fbbf24;
+            box-shadow: 0 0 8px rgba(251, 191, 36, 0.8);
+        }
+
+        .status-dot.running {
+            background: #22c55e;
+            box-shadow: 0 0 8px rgba(34, 197, 94, 0.9);
+        }
+
+        .card-body {
+            display: grid;
+            gap: 12px;
+        }
+
+        .controls-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .btn {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 8px 18px;
+            border-radius: 999px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            letter-spacing: 0.03em;
+            color: #0f172a;
+            background: linear-gradient(135deg, var(--accent-strong), #22c55e);
+            box-shadow: 0 10px 25px rgba(34, 197, 94, 0.4);
+            transition: transform 0.12s ease-out, box-shadow 0.12s ease-out, filter 0.12s ease-out;
+        }
+
+        .btn span.dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 999px;
+            background: #0f172a;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px) translateZ(0);
+            box-shadow: 0 16px 30px rgba(34, 197, 94, 0.5);
+            filter: brightness(1.03);
+        }
+
+        .btn:active {
+            transform: translateY(0) scale(0.98);
+            box-shadow: 0 8px 18px rgba(34, 197, 94, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .hint-text {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .hint-text b {
+            color: var(--accent);
+        }
+
+        .webcam-shell {
+            margin-top: 8px;
+            padding: 10px;
+            border-radius: 14px;
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+        }
+
+        #webcam-container canvas {
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, 0.4);
+            background: #020617;
+        }
+
+        .webcam-tip {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .results-card {
+            background: rgba(15, 23, 42, 0.96);
+            border-radius: 18px;
+            border: 1px solid var(--card-border);
+            padding: 16px 16px 14px;
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.9);
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .results-title {
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .results-subtitle {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .result-item {
+            margin-bottom: 6px;
+        }
+
+        .result-label-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+        }
+
+        .result-label {
+            font-weight: 500;
+        }
+
+        .result-value {
+            color: var(--text-muted);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .result-bar-outer {
+            margin-top: 3px;
+            height: 6px;
+            border-radius: 999px;
+            background: rgba(31, 41, 55, 0.85);
+            overflow: hidden;
+        }
+
+        .result-bar-inner {
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, var(--accent), #22c55e);
+            transform-origin: left;
+            transform: scaleX(0.05);
+            transition: transform 0.15s ease-out;
+        }
+
+        .result-item.top {
+            background: var(--accent-soft);
+            border-radius: 10px;
+            padding: 6px 8px;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+        }
+
+        .result-item.top .result-bar-inner {
+            background: linear-gradient(90deg, #f97316, #facc15);
+        }
+
+        .footer-note {
+            margin-top: 16px;
+            text-align: center;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+<div class="app-wrapper">
+    <header class="header">
+        <div class="title-badge">
+            <span class="title-badge-dot"></span>
+            Teachable Machine × WebCam 影像辨識
+        </div>
+        <h1>即時影像分類小實驗</h1>
+        <p class="subtitle">
+            點一下「開始辨識」，開啟攝影機並使用你在 Teachable Machine 訓練好的模型，
+            看看畫面中的動作或物件會被分類到哪一類。
+        </p>
+    </header>
+
+    <main class="main-layout">
+        <!-- 左側：攝影機 + 控制 -->
+        <section class="card">
+            <div class="card-inner">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span class="card-title-icon"></span>
+                        即時攝影畫面
+                    </div>
+                    <div class="status-chip" id="status-chip">
+                        <span class="status-dot" id="status-dot"></span>
+                        <span id="status-text">尚未啟動</span>
+                    </div>
+                </div>
+
+                <div class="card-body">
+                    <div class="controls-row">
+                        <button
+                            id="start-btn"
+                            type="button"
+                            class="btn"
+                            onclick="init()"
+                        >
+                            <span class="dot"></span>
+                            開始辨識
+                        </button>
+                        <div class="hint-text">
+                            ✅ 建議在<span><b>桌機或筆電</b></span>使用，並允許瀏覽器使用攝影機。
+                        </div>
+                    </div>
+
+                    <div class="webcam-shell">
+                        <div id="webcam-container"></div>
+                        <div class="webcam-tip">
+                            若畫面無法顯示，請確認：1) 已允許攝影機權限，2) 瀏覽器未封鎖 http/https 來源。
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 右側：辨識結果 -->
+        <section class="results-card">
+            <div class="results-header">
+                <div>
+                    <div class="results-title">辨識結果</div>
+                    <div class="results-subtitle">依機率由高到低顯示各類別</div>
+                </div>
+            </div>
+            <div id="label-container"></div>
+
+            <div class="footer-note">
+                本頁面僅作為教學與示範使用。請替換 <code>./my_model/</code> 目錄為你的 Teachable Machine 模型匯出資料夾。
+            </div>
+        </section>
+    </main>
+</div>
+
+<!-- Scripts -->
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
 <script type="text/javascript">
-    // More API functions here:
-    // https://github.com/googlecreativelab/teachablemachine-community/tree/master/libraries/image
-
-    // the link to your model provided by Teachable Machine export panel
     const URL = "./my_model/";
 
     let model, webcam, labelContainer, maxPredictions;
+    let isRunning = false;
 
-    // Load the image model and setup the webcam
+    const startBtn = document.getElementById("start-btn");
+    const statusText = document.getElementById("status-text");
+    const statusDot = document.getElementById("status-dot");
+    const statusChip = document.getElementById("status-chip");
+
+    function setStatus(text, state) {
+        statusText.textContent = text;
+
+        statusDot.classList.remove("running");
+        statusChip.style.borderColor = "rgba(148, 163, 184, 0.6)";
+
+        if (state === "running") {
+            statusDot.classList.add("running");
+            statusChip.style.borderColor = "rgba(34, 197, 94, 0.9)";
+        } else if (state === "error") {
+            statusDot.style.background = "var(--danger)";
+            statusChip.style.borderColor = "var(--danger)";
+        } else {
+            statusDot.style.background = "#fbbf24";
+        }
+    }
+
+    // 載入模型並啟動攝影機
     async function init() {
-        const modelURL = URL + "model.json";
-        const metadataURL = URL + "metadata.json";
+        if (isRunning) return;
 
-        // load the model and metadata
-        // Refer to tmImage.loadFromFiles() in the API to support files from a file picker
-        // or files from your local hard drive
-        // Note: the pose library adds "tmImage" object to your window (window.tmImage)
-        model = await tmImage.load(modelURL, metadataURL);
-        maxPredictions = model.getTotalClasses();
+        try {
+            isRunning = true;
+            startBtn.disabled = true;
+            startBtn.textContent = "載入中…";
+            setStatus("模型載入中，請稍候…", "loading");
 
-        // Convenience function to setup a webcam
-        const flip = true; // whether to flip the webcam
-        webcam = new tmImage.Webcam(200, 200, flip); // width, height, flip
-        await webcam.setup(); // request access to the webcam
-        await webcam.play();
-        window.requestAnimationFrame(loop);
+            const modelURL = URL + "model.json";
+            const metadataURL = URL + "metadata.json";
 
-        // append elements to the DOM
-        document.getElementById("webcam-container").appendChild(webcam.canvas);
-        labelContainer = document.getElementById("label-container");
-        for (let i = 0; i < maxPredictions; i++) { // and class labels
-            labelContainer.appendChild(document.createElement("div"));
+            model = await tmImage.load(modelURL, metadataURL);
+            maxPredictions = model.getTotalClasses();
+
+            const flip = true;
+            webcam = new tmImage.Webcam(200, 200, flip);
+            await webcam.setup();
+            await webcam.play();
+            window.requestAnimationFrame(loop);
+
+            document.getElementById("webcam-container").innerHTML = "";
+            document.getElementById("webcam-container").appendChild(webcam.canvas);
+
+            labelContainer = document.getElementById("label-container");
+            labelContainer.innerHTML = "";
+
+            // 先建立對應的結果列
+            for (let i = 0; i < maxPredictions; i++) {
+                const item = document.createElement("div");
+                item.className = "result-item";
+                item.innerHTML = `
+                    <div class="result-label-row">
+                        <span class="result-label"></span>
+                        <span class="result-value"></span>
+                    </div>
+                    <div class="result-bar-outer">
+                        <div class="result-bar-inner"></div>
+                    </div>
+                `;
+                labelContainer.appendChild(item);
+            }
+
+            startBtn.textContent = "辨識進行中";
+            setStatus("辨識進行中…", "running");
+        } catch (err) {
+            console.error(err);
+            setStatus("發生錯誤，請檢查主控台(console)訊息。", "error");
+            startBtn.disabled = false;
+            startBtn.textContent = "重新嘗試";
+            isRunning = false;
         }
     }
 
     async function loop() {
-        webcam.update(); // update the webcam frame
+        if (!webcam) return;
+        webcam.update();
         await predict();
         window.requestAnimationFrame(loop);
     }
 
-    // run the webcam image through the image model
+    // 進行推論
     async function predict() {
-        // predict can take in an image, video or canvas html element
+        if (!model || !webcam) return;
+
         const prediction = await model.predict(webcam.canvas);
-        for (let i = 0; i < maxPredictions; i++) {
-            const classPrediction =
-                prediction[i].className + ": " + prediction[i].probability.toFixed(2);
-            labelContainer.childNodes[i].innerHTML = classPrediction;
+
+        // 依機率排序（從高到低）
+        const sorted = prediction
+            .map((p, index) => ({ ...p, index }))
+            .sort((a, b) => b.probability - a.probability);
+
+        for (let rank = 0; rank < sorted.length; rank++) {
+            const { className, probability, index } = sorted[rank];
+            const item = labelContainer.children[rank];
+            if (!item) continue;
+
+            const labelEl = item.querySelector(".result-label");
+            const valueEl = item.querySelector(".result-value");
+            const barEl = item.querySelector(".result-bar-inner");
+
+            // 標記最高機率的項目
+            item.classList.toggle("top", rank === 0);
+
+            labelEl.textContent = className;
+            valueEl.textContent = (probability * 100).toFixed(1) + "%";
+
+            const barScale = Math.max(probability, 0.05);
+            barEl.style.transform = "scaleX(" + barScale + ")";
         }
     }
 </script>
+</body>
+</html>
